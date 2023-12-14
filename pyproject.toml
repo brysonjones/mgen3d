@@ -1,0 +1,49 @@
+[build-system]
+requires = ["setuptools >= 61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mgen3d"
+version = "0.0.1"
+dependencies = [
+  "bpy >= 4.0.0",
+  "pytest >= 7.0.0",
+  "absl-py >= 2.0.0",
+  "nerfacc >= 0.5.3",
+  "tqdm > 4.60.0",
+  "numpy  >= 1.19.5",
+  "torch >= 2.0.1",
+  "trimesh >= 4.0.5"
+]
+requires-python = ">=3.10"
+authors = [
+  {name = "Bryson Jones", email = "bkjones97@gmail.com"},
+  {name = "Guglielmo Daddi", email = "TODO@gmail.com"}
+]
+maintainers = [
+  {name = "Bryson Jones", email = "bkjones97@gmail.com"},
+  {name = "Guglielmo Daddi", email = "TODO@gmail.com"}
+]
+description = "A python library for generating 3D Mesh Models with text and image guidance"
+readme = "README.md"
+license = {file = "LICENSE"}
+keywords = ["generative", "model", "mesh", "diffusion", "LLM", "VLM", "NeRF", "3D"]
+
+[project.optional-dependencies]
+# TODO: Add optional dependencies here
+
+[project.urls]
+# TODO:
+# Homepage = "https://example.com"
+# Documentation = "https://readthedocs.org"
+# Repository = "https://github.com/me/spam.git"
+# "Bug Tracker" = "https://github.com/me/spam/issues"
+# Changelog = "https://github.com/me/spam/blob/master/CHANGELOG.md"
+
+[project.scripts]
+mgen3d-main = "main:main"
+
+[tool.pytest.ini_options]
+addopts = [
+    "--import-mode=importlib",
+]
