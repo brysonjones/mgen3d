@@ -12,10 +12,12 @@ dependencies = [
   "nerfacc >= 0.5.3",
   "tqdm > 4.60.0",
   "numpy  >= 1.19.5",
+  "scipy >= 1.11.0",
   "torch >= 2.0.1",
-  "trimesh >= 4.0.5"
+  "trimesh >= 4.0.5",
+  "pyglet < 2.0.0"
 ]
-requires-python = ">=3.10"
+requires-python = ">=3.9"
 authors = [
   {name = "Bryson Jones", email = "bkjones97@gmail.com"},
   {name = "Guglielmo Daddi", email = "TODO@gmail.com"}
@@ -41,7 +43,7 @@ keywords = ["generative", "model", "mesh", "diffusion", "LLM", "VLM", "NeRF", "3
 # Changelog = "https://github.com/me/spam/blob/master/CHANGELOG.md"
 
 [project.scripts]
-mgen3d-main = "main:main"
+mgen3d-viz-test = "mgen3d.pose_generator_utils:main"
 
 [tool.pytest.ini_options]
 addopts = [

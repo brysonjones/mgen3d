@@ -4,8 +4,8 @@ from  mgen3d.pose_generator_utils import *
 
 def test_create_spherical_pose():
     radius = 1
-    theta = np.pi/4
-    phi = np.pi/6
+    theta = 30
+    phi = 45
     c2w = create_spherical_pose(theta, phi, radius)
     assert c2w.shape[0] == 4
     assert c2w.shape[1] == 4
@@ -59,3 +59,6 @@ def test_gen_spherical_poses():
         assert pose.shape == (4, 4)
         assert np.linalg.norm(pose[0:3, 3]) >= radius_range[0] and np.linalg.norm(pose[0:3, 3]) <= radius_range[1]
 
+def test_visualize_poses():
+    poses = gen_spherical_poses(num_poses=30)
+    visualize_poses(poses)

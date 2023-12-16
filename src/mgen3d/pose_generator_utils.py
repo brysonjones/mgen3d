@@ -1,5 +1,6 @@
 
 import numpy as np
+import trimesh
 from typing import *
 
 trans_t = lambda t : np.array([
@@ -42,7 +43,9 @@ def gen_spherical_poses(radius_range:Tuple[float]=(1, 1.5), theta_range:Tuple[fl
     """Generate a list of poses on a sphere
 
     Args:
-        radius (float): radius of sphere
+        radius_range (float): range of radius values
+        theta_range (float): range of theta values
+        phi_range (float): range of phi values
         num_poses (int): number of poses to generate
 
     Returns:
@@ -56,3 +59,68 @@ def gen_spherical_poses(radius_range:Tuple[float]=(1, 1.5), theta_range:Tuple[fl
         poses.append(create_spherical_pose(theta, phi, radius))
     return poses
 
+def compute_frustum_corners(fov, aspect_ratio, near, far):
+    tangent = np.tan(np.radians(fov) / 2)
+    height_near = 2 * near * tangent
+    width_near = height_near * aspect_ratio
+
+    height_far = 2 * far * tangent
+    width_far = height_far * aspect_ratio
+
+    # Near plane corners
+    near_top_left = np.array([-width_near / 2, height_near / 2, -near, 1])
+    near_top_right = np.array([width_near / 2, height_near / 2, -near, 1])
+    near_bottom_left = np.array([-width_near / 2, -height_near / 2, -near, 1])
+    near_bottom_right = np.array([width_near / 2, -height_near / 2, -near, 1])
+
+    # Far plane corners
+    far_top_left = np.array([-width_far / 2, height_far / 2, -far, 1])
+    far_top_right = np.array([width_far / 2, height_far / 2, -far, 1])
+    far_bottom_left = np.array([-width_far / 2, -height_far / 2, -far, 1])
+    far_bottom_right = np.array([width_far / 2, -height_far / 2, -far, 1])
+
+    return np.array([
+        near_top_left, near_top_right, near_bottom_left, near_bottom_right,
+        far_top_left, far_top_right, far_bottom_left, far_bottom_right
+    ])
+
+
+def visualize_poses(poses, size=0.1):
+    axes = trimesh.creation.axis(axis_length=4)
+    sphere = trimesh.creation.icosphere(radius=0.5)
+    objects = [axes, sphere]
+    
+    fov = 60  # field of view in degrees
+    aspect_ratio = 16 / 9  # width/height
+    near = 0.02  # near plane distance
+    far = 0.1  # far plane distance
+    frustrum = compute_frustum_corners(fov, aspect_ratio, near, far)
+
+    for pose in poses:
+        # the camera frustrum is visualized with 12 line segments.
+        frustrum_in_world_frame = [pose @ corner for corner in frustrum]
+        segs = np.array([ # near plane
+                         [frustrum_in_world_frame[0][:3], frustrum_in_world_frame[1][:3]],
+                         [frustrum_in_world_frame[1][:3], frustrum_in_world_frame[3][:3]],
+                         [frustrum_in_world_frame[3][:3], frustrum_in_world_frame[2][:3]],
+                         [frustrum_in_world_frame[2][:3], frustrum_in_world_frame[0][:3]],
+                         # far plane
+                         [frustrum_in_world_frame[4][:3], frustrum_in_world_frame[5][:3]],
+                         [frustrum_in_world_frame[5][:3], frustrum_in_world_frame[7][:3]],
+                         [frustrum_in_world_frame[7][:3], frustrum_in_world_frame[6][:3]],
+                         [frustrum_in_world_frame[6][:3], frustrum_in_world_frame[4][:3]],
+                         # sides
+                         [frustrum_in_world_frame[0][:3], frustrum_in_world_frame[4][:3]],
+                         [frustrum_in_world_frame[1][:3], frustrum_in_world_frame[5][:3]],
+                         [frustrum_in_world_frame[2][:3], frustrum_in_world_frame[6][:3]],
+                         [frustrum_in_world_frame[3][:3], frustrum_in_world_frame[7][:3]]])
+        segs = trimesh.load_path(segs)
+        objects.append(segs)
+
+    trimesh.Scene(objects).show()
+
+
+def main():
+    poses = gen_spherical_poses()
+    visualize_poses(poses)
+                    
