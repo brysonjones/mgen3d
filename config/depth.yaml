@@ -1,0 +1,6 @@
+components:
+  depth_key: "facebook/dpt-dinov2-small-kitti"
+  
+workspace:
+  input_path: ./data/test/car.jpg
+  path: ./outputs/depth

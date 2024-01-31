@@ -1,0 +1,3 @@
+
+components:
+  depth_key: "facebook/dpt-dinov2-small-kitti"
