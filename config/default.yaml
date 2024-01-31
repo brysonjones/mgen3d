@@ -1,0 +1,73 @@
+network:
+  pos_encoding: {
+    "otype": "HashGrid",
+    "n_levels": 16,
+    "n_features_per_level": 2,
+    "log2_hashmap_size": 19,
+    "base_resolution": 16,
+  }
+  density_network: {
+    "otype": "FullyFusedMLP",
+    "activation": "ReLU",
+    "output_activation": "None",
+    "n_neurons": 64,
+    "n_hidden_layers": 1
+  }
+  dir_encoding: {
+    "otype": "Composite",
+    "nested": [
+      {
+        "n_dims_to_encode": 3,
+        "otype": "SphericalHarmonics",
+        "degree": 4
+      }
+    ]
+  }
+  rgb_network: {
+    "otype": "FullyFusedMLP",
+    "activation": "ReLU",
+    "output_activation": "None",
+    "n_neurons": 64,
+    "n_hidden_layers": 2
+  }
+
+estimator:
+  aabb_scale: 1.5
+  grid_resolution: 128
+  grid_nlvl: 1
+
+optimizer:
+  learning_rate: 0.02
+  grad_norm_clip: 10.0e-3
+  beta:
+    - 0.9
+    - 0.999
+  epsilon: 1.0e-15
+  warm_up_steps: 10 # 512
+  scheduler_step_period: 1
+  max_steps: 20000
+  gamma: 0.33
+  grad_scaler: 1024  # 2^10
+
+paths:
+  checkpoint_path: "./outputs/checkpoints/"
+  output_image_path: "./outputs/images/"
+
+scene:
+  white_background: True
+
+rays:
+  chunk_size: 32768  # 2^15
+  num_rays: 2048  # 2^11
+
+sampling:
+  near_plane: 0.2
+  far_plane: 1.0e+10
+  early_stop_eps: 1.0e-4
+  alpha_thresh: 0.0
+  render_step_size: 5.0e-3
+  stratified_sampling: True
+  sampling_cone_angle: 0.0
+
+evaluation:
+  period: 5

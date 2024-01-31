@@ -1,0 +1,1 @@
+docker run -v $PWD:/ws/mgen3d -it --gpus all mgen3d/mgen3d bash

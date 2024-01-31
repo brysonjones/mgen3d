@@ -1,0 +1,1 @@
+train_full_nerf --data_path=./data/nerf_synthetic/lego

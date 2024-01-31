@@ -1,0 +1,38 @@
+network:
+  num_layers: 8
+  hidden_size: 128
+  skip_connection_layers: [4]
+
+estimator:
+  aabb_scale: 1.0
+  grid_resolution: 128
+  grid_nlvl: 1
+
+optimizer:
+  learning_rate: 5.0e-4
+  gamma: 0.99
+  grad_norm_clip: 10.0e-3
+  beta:
+    - 0.9
+    - 0.999
+  epsilon: 1.0e-5
+  warm_up_steps: 512
+  scheduler_step_period: 1
+
+paths:
+  checkpoint_path: "./outputs/checkpoints/"
+  output_image_path: "./outputs/images/"
+
+scene:
+  white_background: False
+
+rays:
+  chunk_size: 32768  # 2^15
+  num_rays: 2048  # 2^11
+
+sampling:
+  early_stop_eps: 1.0e-4
+  alpha_thresh: 1.0e-2
+  render_step_size: 5.0e-3
+  stratified_sampling: False
+  sampling_cone_angle: 0.0
