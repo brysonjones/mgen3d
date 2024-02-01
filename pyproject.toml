@@ -6,6 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "mgen3d"
 version = "0.0.1"
 dependencies = [
+  "pytest >= 7.0.0",
   "absl-py >= 2.0.0",
   "coverage",
   "opencv-python >= 4.8.0.0",
@@ -16,6 +17,8 @@ dependencies = [
   "pillow >= 9.0.0",
   "tqdm > 4.60.0",
   "torch >= 1.12.0",
+  "torchvision>=0.13.0",
+  "torchaudio>=0.12.0",
   "trimesh >= 4.0.5",
   "pytest >= 7.0.0",
   "pyglet < 2.0.0",
@@ -27,11 +30,11 @@ dependencies = [
 requires-python = ">=3.8"
 authors = [
   {name = "Bryson Jones", email = "bkjones97@gmail.com"},
-  {name = "Guglielmo Daddi", email = "TODO@gmail.com"}
+  {name = "Guglielmo Daddi", email = "guglielmo.daddi.96@gmail.com"}
 ]
 maintainers = [
   {name = "Bryson Jones", email = "bkjones97@gmail.com"},
-  {name = "Guglielmo Daddi", email = "TODO@gmail.com"}
+  {name = "Guglielmo Daddi", email = "guglielmo.daddi.96@gmail.com"}
 ]
 description = "A python library for generating 3D Mesh Models with text and image guidance"
 readme = "README.md"
@@ -53,6 +56,7 @@ keywords = ["generative", "model", "mesh", "diffusion", "LLM", "VLM", "NeRF", "3
 mgen3d-viz-test = "mgen3d.pose_generator_utils:main"
 train_full_nerf = "mgen3d.pipelines.nerf_pipeline:main"
 mgen3d-depth-test = "mgen3d.depth:main"
+mgen3d-diffusion = "mgen3d.diffusion:main"
 
 [tool.pytest.ini_options]
 addopts = [

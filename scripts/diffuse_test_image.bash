@@ -1,0 +1,1 @@
+mgen3d-diffusion --config_path=./config/diffusion.yaml

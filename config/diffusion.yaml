@@ -1,0 +1,16 @@
+components:
+  diffusion_key: stabilityai/stable-diffusion-2-base
+  clip_key: openai/clip-vit-large-patch14  # openai/clip-vit-base-patch16 -- this is a smaller, but faster model -- should ablate performance
+
+denoising:
+  sd_version: "2.0"
+  num_steps: 50
+  min_step: 0.02
+  max_step: 0.98
+
+generation:
+  prompt: "A photo of a cat"
+  guidance_scale: 7.5
+
+workspace:
+  path: ./outputs/diffusion/
