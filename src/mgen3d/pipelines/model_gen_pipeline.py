@@ -3,6 +3,7 @@ import sys
 import absl.flags as flags
 import torch
 import torch.nn.functional as F
+from torchmetrics.regression import PearsonCorrCoef
 import yaml
 
 from mgen3d.nerf.nerf import NeRF
@@ -46,8 +47,11 @@ class Pipeline:
         loss = F.l1_loss(rendered_image * mask, target_image, reduction='mean')
         return loss
     
-    def depth_loss(self):
-        pass
+    def depth_loss(self, depth_pred, depth_ref, mask): 
+        # use negative pearson correlation coefficient as loss
+        pearson = PearsonCorrCoef()
+        loss = -pearson(depth_pred[mask], depth_ref[mask])
+        return loss
 
 def main():
     flags.FLAGS(sys.argv)
