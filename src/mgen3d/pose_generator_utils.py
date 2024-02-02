@@ -23,7 +23,6 @@ rot_theta = lambda th: np.array(
     ]
 )
 
-
 def create_spherical_pose(theta: float, phi: float, radius: float):
     """
 
