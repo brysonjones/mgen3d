@@ -151,53 +151,56 @@ class NeRF:
         # create index list and shuffle before iteratinng through images
         dataloader = DataLoader(dataset, 1, shuffle=True, num_workers=0)
         for sample in tqdm.tqdm(dataloader):
-            # update occupancy grid
-            def occ_eval_fn(x):
-                density = self._network(x)
-                occ = density * self.render_step_size_
-                return occ
-
-            self._estimator.update_every_n_steps(
-                step=self._step,
-                occ_eval_fn=occ_eval_fn,
-                occ_thre=1e-2,
-            )
-            self._step = self._step + 1
-
-            # get image
-            image = sample["imgs"].squeeze().to(device)
-
-            # generate random ray sample coordinates
-            if self.num_rays is None:
-                ray_coords = None
-                target = image
-            else:
-                H = sample["H"].item()
-                W = sample["W"].item()
-                coords = torch.stack(
-                    torch.meshgrid(
-                        torch.linspace(0, H - 1, H),
-                        torch.linspace(0, W - 1, W),
-                        indexing="ij",
-                    ),
-                    -1,
-                )  # (H, W, 2)
-                coords = torch.reshape(coords, [-1, 2])  # (H * W, 2)
-                select_inds = np.random.choice(
-                    coords.shape[0], size=[self.num_rays], replace=False
-                )  # (num_rays,)
-                ray_coords = coords[select_inds].long()  # (num_rays, 2)
-                target = image[ray_coords[:, 0], ray_coords[:, 1]]  # (num_rays, 3)
-
-            with torch.cuda.amp.autocast():
-                rgb_map = self.forward_pass(sample, ray_coords)
-                loss = self.loss_fn(rgb_map, target)
-            self.optimize(loss, epoch_num)
-            train_loss += loss.item()
+            train_loss += self.train_one_step(sample, epoch_num)
         train_loss /= len(dataset)
         self.save_checkpoint(epoch_num, train_loss)
 
         return train_loss
+    
+    def train_one_step(self, sample: dict, epoch_num: int):
+        # update occupancy grid
+        def occ_eval_fn(x):
+            density = self._network(x)
+            occ = density * self.render_step_size_
+            return occ
+
+        self._estimator.update_every_n_steps(
+            step=self._step,
+            occ_eval_fn=occ_eval_fn,
+            occ_thre=1e-2,
+        )
+        self._step = self._step + 1
+
+        # get image
+        image = sample["imgs"].squeeze().to(device)
+
+        # generate random ray sample coordinates
+        if self.num_rays is None:
+            ray_coords = None
+            target = image
+        else:
+            H = sample["H"].item()
+            W = sample["W"].item()
+            coords = torch.stack(
+                torch.meshgrid(
+                    torch.linspace(0, H - 1, H),
+                    torch.linspace(0, W - 1, W),
+                    indexing="ij",
+                ),
+                -1,
+            )  # (H, W, 2)
+            coords = torch.reshape(coords, [-1, 2])  # (H * W, 2)
+            select_inds = np.random.choice(
+                coords.shape[0], size=[self.num_rays], replace=False
+            )  # (num_rays,)
+            ray_coords = coords[select_inds].long()  # (num_rays, 2)
+            target = image[ray_coords[:, 0], ray_coords[:, 1]]  # (num_rays, 3)
+
+        with torch.cuda.amp.autocast():
+            rgb_map = self.forward_pass(sample, ray_coords)
+            loss = self.loss_fn(rgb_map, target)
+        self.optimize(loss, epoch_num)
+        return loss.item()
 
     def optimize(self, loss: torch.Tensor, epoch: int):
         self._optimizer.zero_grad()

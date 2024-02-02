@@ -333,6 +333,5 @@ def main():
         os.path.join(output_path, prompt.replace(" ", "_") + ".png"),
     )
 
-
 if __name__ == "__main__":
     main()
