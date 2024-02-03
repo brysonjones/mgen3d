@@ -41,16 +41,19 @@ class NeRFDataset(Dataset):
         self.imgs = torch.tensor(np.array(imgs))  # keep all 4 channels (RGBA)
         self.poses = torch.tensor(np.array(poses), dtype=torch.float)
 
+    def calculate_focal_length(self, H, W, fov_y, fov_x):
+        focal_y = 0.5 * H / np.tan(0.5 * fov_y)
+        focal_x = 0.5 * W / np.tan(0.5 * fov_x)
+        return focal_y, focal_x
+
     def resize_image(self, image, H, W, fov_y, fov_x):
         if self.image_shape is None:
-            focal_y = 0.5 * H / np.tan(0.5 * fov_y)
-            focal_x = 0.5 * W / np.tan(0.5 * fov_x)
+            focal_y, focal_x = self.calculate_focal_length(H, W, fov_y, fov_x)
             return int(H), int(W), focal_y, focal_x, image
         else:
             new_H = self.image_shape[1]
             new_W = self.image_shape[0]
-            focal_y = 0.5 * new_H / np.tan(0.5 * fov_y)
-            focal_x = 0.5 * new_W / np.tan(0.5 * fov_x)
+            focal_y, focal_x = self.calculate_focal_length(new_H, new_W, fov_y, fov_x)
             return (
                 int(new_H),
                 int(new_W),
