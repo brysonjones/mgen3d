@@ -207,7 +207,7 @@ class StableDiffusion(nn.Module):
         self.clip_loss_scale_factor = 10.0
         self.t_threshold_for_loss = 0.4
         
-    def score_distillation_score_loss(self, noise_pred, noise, latents, t_sample):
+    def score_distillation_sampling_loss(self, noise_pred, noise, latents, t_sample):
         w = 1 - self.alphas[t_sample]
         grad = w * (noise_pred - noise)
         grad = torch.nan_to_num(grad)
@@ -269,7 +269,7 @@ class StableDiffusion(nn.Module):
                 noise_pred, t_sample, latents_noisy, ref_rgb, ref_text
             )
         else:
-            loss = self.score_distillation_score_loss(noise_pred, noise, latents, t_sample)
+            loss = self.score_distillation_sampling_loss(noise_pred, noise, latents, t_sample)
 
         return loss, images
 

@@ -3,13 +3,16 @@ import sys
 import absl.flags as flags
 import torch
 import torch.nn.functional as F
+from torch.utils.data import Dataset, DataLoader
 from torchmetrics.regression import PearsonCorrCoef
+import tqdm
 import yaml
 
 from mgen3d.nerf.nerf import NeRF
 from mgen3d.nerf.utils import *
 from mgen3d.diffusion import StableDiffusion
 from mgen3d.depth import DPT
+from mgen3d.data.sampling_dataset import SamplingDataset
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string('config_path', "./config/default.yaml", 'Path to the config file')
@@ -32,10 +35,36 @@ class Pipeline:
         self.stable_diffusion = StableDiffusion(config, device=device)
         self.depth_model = DPT(config, device=device)
         
-    def train(self):
-        pass
+        
+    def train(self,
+        num_epochs: int,
+        train_dataset: Dataset):  
+        loss_list = []  # training along iterations
+        train_dataloader = DataLoader(train_dataset, 1, shuffle=True, num_workers=0)
+        for epoch in tqdm.trange(0, num_epochs):
+            train_loss = self.train_epoch(train_dataset, epoch)
+            loss_list.append(train_loss)
     
     def train_epoch(self):
+        # if reference view
+            # generate rays at reference view
+            # sample rays
+            # sample points along rays
+            # render with nerf 
+            # take pixel-wise loss
+            # take depth loss
+        # if sampled view
+            # generate rays at sampled view
+            # sample rays
+            # sample points along rays
+            # render with nerf
+            # generate detailed description of the reference view with image captioning model (this can likely be done once ahead of time)
+            # encode the rendered image into latents with the diffusion model
+            # perform noise prediction with the diffusion model
+                # if t step of diffusion scheduler is below threshold:
+                    # perform clip loss
+                # else:
+                    # perform score distillaltion sampling loss
         pass
         
     def train_single_step(self):
