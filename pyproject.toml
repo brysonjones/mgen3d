@@ -25,7 +25,8 @@ dependencies = [
   "tinycudann @ git+https://github.com/NVlabs/tiny-cuda-nn/#subdirectory=bindings/torch",
   "diffusers >= 0.25.1",
   "transformers >= 4.37.0",
-  "accelerate >= 0.26.1"
+  "accelerate >= 0.26.1",
+  "black >= 24.0"
 ]
 requires-python = ">=3.8"
 authors = [
