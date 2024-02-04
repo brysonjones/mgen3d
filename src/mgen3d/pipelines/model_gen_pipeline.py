@@ -19,6 +19,13 @@ flags.DEFINE_string('config_path', "./config/default.yaml", 'Path to the config 
 
 flags.mark_flag_as_required('config_path')
 
+
+def pixel_wise_loss(rendered_image, target_image, mask=None):
+    if mask is None:
+        mask = torch.ones_like(target_image)
+    loss = F.l1_loss(rendered_image * mask, target_image, reduction='mean')
+    return loss
+
 class Pipeline:
     def __init__(self, config):
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -42,11 +49,14 @@ class Pipeline:
         loss_list = []  # training along iterations
         train_dataloader = DataLoader(train_dataset, 1, shuffle=True, num_workers=0)
         for epoch in tqdm.trange(0, num_epochs):
-            train_loss = self.train_epoch(train_dataset, epoch)
+            sample = next(iter(train_dataloader))
+            train_loss = self.train_epoch(sample, epoch)
             loss_list.append(train_loss)
     
-    def train_epoch(self):
+    def train_epoch(self, sample):
         # if reference view
+        if sample['is_reference']:
+            pass
             # generate rays at reference view
             # sample rays
             # sample points along rays
@@ -67,14 +77,8 @@ class Pipeline:
                     # perform score distillaltion sampling loss
         pass
         
-    def train_single_step(self):
+    def nerf_generation_step(self, sample):
         pass
-    
-    def pixel_wise_loss(self, rendered_image, target_image, mask=None):
-        if mask is None:
-            mask = torch.ones_like(target_image)
-        loss = F.l1_loss(rendered_image * mask, target_image, reduction='mean')
-        return loss
     
     def depth_loss(self, depth_pred, depth_ref, mask): 
         # use negative pearson correlation coefficient as loss
