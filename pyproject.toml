@@ -23,7 +23,7 @@ dependencies = [
   "pytest >= 7.0.0",
   "pyglet < 2.0.0",
   "tinycudann @ git+https://github.com/NVlabs/tiny-cuda-nn/#subdirectory=bindings/torch",
-  "diffusers >= 0.25.1",`
+  "diffusers >= 0.25.1",
   "transformers >= 4.37.0",
   "accelerate >= 0.26.1",
   "black >= 24.0"
