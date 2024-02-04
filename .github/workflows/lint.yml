@@ -22,9 +22,10 @@ jobs:
           python-version: 3.8
       - name: Install python dependencies
         run: pip install black
-      - name: Run black
+      - name: Run linters
         uses: wearerequired/lint-action@v2
         with:
-          linters: black
+          auto_fix: false
+          black: true
           black_auto_fix: false
         
