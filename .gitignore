@@ -1,3 +1,4 @@
 *data/*
 !data/test
 outputs
+*.egg-info
