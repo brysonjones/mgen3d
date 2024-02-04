@@ -21,7 +21,7 @@ jobs:
         with:
           python-version: 3.8
       - name: Install python dependencies
-        run: pip install -r black
+        run: pip install black
       - name: Run black
         uses: wearerequired/lint-action@v2
         with:
