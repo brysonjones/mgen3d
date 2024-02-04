@@ -167,7 +167,7 @@ class NeRF:
 
         # get image
         image = sample["imgs"].squeeze().to(device)
-        ray_coords = self.get_ray_coords(sample["H"], sample["W"])
+        ray_coords = self.get_ray_coords(sample["H"].item(), sample["W"].item())
         target_image = self.get_target_image(image, ray_coords)
 
         with torch.cuda.amp.autocast():
