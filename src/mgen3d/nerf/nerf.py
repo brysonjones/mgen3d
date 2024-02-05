@@ -83,9 +83,9 @@ class NeRF:
         else:
             output_shape = (input_dict["H"], input_dict["W"], 3)
 
-        rgb_map = self.render_image(rays_o, rays_d, output_shape, self.chunk_size)
+        rgb_map, opacity_map, depth_map = self.render_image(rays_o, rays_d, output_shape, self.chunk_size)
 
-        return rgb_map
+        return rgb_map, opacity_map, depth_map
 
     def train(
         self,
@@ -151,7 +151,7 @@ class NeRF:
         # create index list and shuffle before iteratinng through images
         dataloader = DataLoader(dataset, 1, shuffle=True, num_workers=0)
         for sample in tqdm.tqdm(dataloader):
-            pred_image, target_image = self.train_one_step(sample)
+            pred_image, _, _, target_image = self.train_one_step(sample)
             with torch.cuda.amp.autocast():
                 sample_loss = self.loss_fn(pred_image, target_image)
             self.optimize(sample_loss, epoch_num)
@@ -171,8 +171,8 @@ class NeRF:
         target_image = self.get_target_image(image, ray_coords)
 
         with torch.cuda.amp.autocast():
-            pred_image = self.forward_pass(sample, ray_coords)
-        return pred_image, target_image
+            pred_image, pred_opacity, pred_depth = self.forward_pass(sample, ray_coords)
+        return pred_image, pred_opacity, pred_depth, target_image
 
     def update_occ_grid(self):
         # update occupancy grid
@@ -243,7 +243,7 @@ class NeRF:
             dataloader = DataLoader(dataset, 1, shuffle=True, num_workers=0)
             for sample in tqdm.tqdm(dataloader):
                 image = sample["imgs"].squeeze().to(device)
-                rgb_map = self.forward_pass(sample, None)
+                rgb_map, _, _ = self.forward_pass(sample, None)
                 mse_loss = self.loss_fn(rgb_map, image)
                 psnr += calc_psnr_from_mse(mse_loss)
         psnr /= len(dataset)
@@ -283,7 +283,9 @@ class NeRF:
         ray_d_chunks = get_chunks(rays_d, chunk_size)
 
         # neural radiance field querying
-        chunked_outputs = []
+        chunked_color_outputs = []
+        chunked_opacity_outputs = []
+        chunked_depth_outputs = []
         for ray_o_chunk, ray_d_chunk in zip(ray_o_chunks, ray_d_chunks):
             ray_o_chunk = ray_o_chunk.reshape(-1, ray_o_chunk.shape[-1])
             ray_d_chunk = ray_d_chunk.reshape(-1, ray_d_chunk.shape[-1])
@@ -310,10 +312,14 @@ class NeRF:
                 rgb_sigma_fn=rgb_sigma_fn,
                 render_bkgd=torch.tensor([1.0, 1.0, 1.0]).to(device),
             )
-            chunked_outputs.append(color)
-        outputs = torch.cat(chunked_outputs, dim=0).reshape(output_shape)
+            chunked_color_outputs.append(color)
+            chunked_opacity_outputs.append(opacity)
+            chunked_depth_outputs.append(depth)
+        color_outputs = torch.cat(chunked_color_outputs, dim=0).reshape(output_shape)
+        opacity_outputs = torch.cat(chunked_opacity_outputs, dim=0).reshape(output_shape[0], 1)
+        depth_outputs = torch.cat(chunked_depth_outputs, dim=0).reshape(output_shape[0], 1)
 
-        return outputs
+        return color_outputs, opacity_outputs, depth_outputs
 
     def render_view(self, view_dict: np.ndarray):
         """Render a view from a given pose.
@@ -326,7 +332,7 @@ class NeRF:
         """
         self._network.eval()
         with torch.no_grad():
-            rgb_map = self.forward_pass(view_dict, None)
+            rgb_map, _, _ = self.forward_pass(view_dict, None)
             rgb_map = rgb_map.cpu().numpy()
             rgb_map = np.maximum(
                 np.minimum(rgb_map, np.ones_like(rgb_map)), np.zeros_like(rgb_map)

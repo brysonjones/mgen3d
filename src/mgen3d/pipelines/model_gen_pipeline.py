@@ -28,9 +28,9 @@ def pixel_wise_loss(rendered_image, target_image, mask=None):
 
 class Pipeline:
     def __init__(self, config):
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        nerf_estimator = construct_estimator(config, device=device)
-        nerf_network = construct_network(config, device=device)
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        nerf_estimator = construct_estimator(config, device=self.device)
+        nerf_network = construct_network(config, device=self.device)
         nerf_optimizer = construct_optimizer(config, nerf_network)
         nerf_scheduler = construct_scheduler(config, nerf_optimizer)
         self.nerf = NeRF(config,
@@ -39,30 +39,33 @@ class Pipeline:
                          optimizer=nerf_optimizer,
                          scheduler=nerf_scheduler
                         )
-        self.stable_diffusion = StableDiffusion(config, device=device)
-        self.depth_model = DPT(config, device=device)
+        self.stable_diffusion = StableDiffusion(config, device=self.device)
+        self.depth_model = DPT(config, device=self.device)
         
         
     def train(self,
-        num_epochs: int,
+        num_iterations: int,
         train_dataset: Dataset):  
         loss_list = []  # training along iterations
         train_dataloader = DataLoader(train_dataset, 1, shuffle=True, num_workers=0)
-        for epoch in tqdm.trange(0, num_epochs):
+        for iteration in tqdm.trange(0, num_iterations):
             sample = next(iter(train_dataloader))
-            train_loss = self.train_epoch(sample, epoch)
+            train_loss = self.train_epoch(sample, iteration)
             loss_list.append(train_loss)
     
     def train_epoch(self, sample):
         # if reference view
         if sample['is_reference']:
-            pass
             # generate rays at reference view
             # sample rays
             # sample points along rays
             # render with nerf 
+            pred_image, _, pred_depth, target_image = self.nerf.train_one_step(sample)
             # take pixel-wise loss
+            with torch.cuda.amp.autocast():
+                pixel_wise_loss = pixel_wise_loss(pred_image, target_image)
             # take depth loss
+            reference_image_depth = self.depth_model(sample["imgs"].squeeze().to(self.device))
         # if sampled view
             # generate rays at sampled view
             # sample rays
