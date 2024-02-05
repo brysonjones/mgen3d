@@ -19,6 +19,20 @@ class DPT(nn.Module):
         self.depth_model = DPTForDepthEstimation.from_pretrained(
             config["components"]["depth_key"]
         )
+        
+    def preprocess_image(self, image, scale=1.0):
+        # Define the transformations
+        transform = transforms.Compose(
+            [
+                transforms.Resize((int(scale * image.size[1]), 
+                                   int(scale * image.size[0]))),
+                transforms.ToTensor(),
+                transforms.Normalize(mean=[0.485, 0.456, 0.406], 
+                                     std=[0.229, 0.224, 0.225]),
+            ]
+        )
+        tensor_image = transform(image)
+        return tensor_image
 
     def get_depth(self, image, scale=1.0):
         # prepare image for the model
@@ -61,20 +75,10 @@ def main():
     image = Image.open(config["workspace"]["input_path"])
     
     scale = 1.0
-
-    # Define the transformations
-    transform = transforms.Compose(
-        [
-            transforms.Resize((int(scale * image.size[1]), 
-                               int(scale * image.size[0]))),
-            transforms.ToTensor(),
-            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-        ]
-    )
-    tensor_image = transform(image)
     
     depth_model = DPT(config, device)
-    depth_prediction = depth_model.get_depth(tensor_image)
+    image = depth_model.preprocess_image(image, scale)
+    depth_prediction = depth_model.get_depth(image)
     output = depth_prediction.squeeze().cpu().numpy()
     formatted = (output * 255 / np.max(output)).astype("uint8")
     depth = Image.fromarray(formatted)
