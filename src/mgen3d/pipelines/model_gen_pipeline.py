@@ -50,22 +50,29 @@ class Pipeline:
         train_dataloader = DataLoader(train_dataset, 1, shuffle=True, num_workers=0)
         for iteration in tqdm.trange(0, num_iterations):
             sample = next(iter(train_dataloader))
-            train_loss = self.train_epoch(sample, iteration)
+            train_loss = self.train_iteration(sample, iteration)
             loss_list.append(train_loss)
     
-    def train_epoch(self, sample):
+    def train_iteration(self, sample):
+        # extract mask of sample image
+        reference_image = sample["imgs"].squeeze().to(self.device)
+        reference_image_mask = self.mask_extractor.extract(reference_image)
+        
         # if reference view
         if sample['is_reference']:
             # generate rays at reference view
             # sample rays
             # sample points along rays
             # render with nerf 
-            pred_image, _, pred_depth, target_image = self.nerf.train_one_step(sample)
+            pred_image, _, pred_depth, _ = self.nerf.train_one_step(sample)
             # take pixel-wise loss
             with torch.cuda.amp.autocast():
-                pixel_wise_loss = pixel_wise_loss(pred_image, target_image)
+                pixel_wise_loss = pixel_wise_loss(pred_image, reference_image, reference_image_mask)
+            # extract depth of reference image
+            reference_image_depth = self.depth_model(reference_image)
             # take depth loss
-            reference_image_depth = self.depth_model(sample["imgs"].squeeze().to(self.device))
+            depth_loss = self.depth_loss(pred_depth, reference_image_depth, reference_image_mask)
+            loss = pixel_wise_loss + depth_loss
         # if sampled view
             # generate rays at sampled view
             # sample rays
