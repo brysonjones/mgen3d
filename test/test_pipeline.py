@@ -1,5 +1,5 @@
 
-from mgen3d.pipelines.gen3d_pipeline import *
+from mgen3d.pipelines.model_gen_pipeline import *
 
 def test_pipeline():
     assert True

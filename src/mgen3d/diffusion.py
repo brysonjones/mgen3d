@@ -204,73 +204,72 @@ class StableDiffusion(nn.Module):
         self.max_step = int(
             self.num_train_timesteps * float(config["denoising"]["max_step"])
         )
+        self.clip_loss_scale_factor = 10.0
+        self.t_threshold_for_loss = 0.4
+        
+    def score_distillation_sampling_loss(self, noise_pred, noise, latents, t_sample):
+        w = 1 - self.alphas[t_sample]
+        grad = w * (noise_pred - noise)
+        grad = torch.nan_to_num(grad)
+        targets = (latents - grad).detach()
+        loss = 0.5 * F.mse_loss(latents, targets, reduction='sum')
+        return loss
+    
+    def clip_loss(self, noise_pred, t_sample, latents_noisy, ref_rgb, ref_text):
+        self.diffusion.scheduler.set_timesteps(self.num_train_timesteps)
+        de_latents = self.diffusion.scheduler.step(noise_pred, t_sample, latents_noisy)[
+            "prev_sample"
+        ]
+        images = self.diffusion.decode_latents(de_latents)
+        loss = self.clip_loss_scale_factor * self.clip.img_clip_loss(
+            images, ref_rgb
+        ) + self.clip_loss_scale_factor * self.clip.img_text_clip_loss(images, ref_text)
+        return loss, images
 
-    def train_step(
+    def train_one_step(
         self,
+        pred_image,
         text_embeddings,
-        pred_rgb,
-        ref_rgb=None,
-        noise=None,
-        islarge=False,
-        ref_text=None,
+        reference_image=None,
+        image_caption=None,
         guidance_scale=10,
     ):
-        # interp to 512x512 to be fed into vae.
         loss = 0
-        imgs = None
+        images = None
 
-        pred_rgb_512 = F.interpolate(
-            pred_rgb, (512, 512), mode="bilinear", align_corners=False
+        pred_image = F.interpolate(
+            pred_image, (512, 512), mode="bilinear", align_corners=False
         )
 
         t_sample = torch.randint(
             self.min_step, self.max_step + 1, [1], dtype=torch.long, device=self.device
         )
 
-        # encode image into latents with vae
-        latents = self.encode_imgs(pred_rgb_512)
+        latents = self.encode_imgs(pred_image)
 
-        # predict the noise residual with unet, NO grad!
         with torch.no_grad():
-            # add noise
             noise = torch.randn_like(latents)
-            latents_noisy = self.scheduler.add_noise(latents, noise, t_sample)
-            # pred noise
+            latents_noisy = self.diffusion.scheduler.add_noise(latents, noise, t_sample)
             latent_model_input = torch.cat([latents_noisy] * 2)
             latent_model_input = latent_model_input.detach().requires_grad_()
 
-            noise_pred = self.unet(
-                latent_model_input, t, encoder_hidden_states=text_embeddings
+            noise_pred = self.diffusion.unet(
+                latent_model_input, t_sample, encoder_hidden_states=text_embeddings
             ).sample
 
-            # perform guidance
             noise_pred_uncond, noise_pred_text = noise_pred.chunk(2)
             noise_pred = noise_pred_text + guidance_scale * (
                 noise_pred_text - noise_pred_uncond
             )
 
-        if not islarge and (t_sample / self.num_train_timesteps) <= 0.4:
-            self.scheduler.set_timesteps(self.num_train_timesteps)
-            de_latents = self.scheduler.step(noise_pred, t_sample, latents_noisy)[
-                "prev_sample"
-            ]
-            imgs = self.decode_latents(de_latents)
-            loss = 10 * self.img_clip_loss(
-                imgs, ref_rgb
-            ) + 10 * self.img_text_clip_loss(imgs, ref_text)
-
+        if (t_sample / self.num_train_timesteps) <= self.t_threshold_for_loss:
+            loss, images = self.clip_loss(
+                noise_pred, t_sample, latents_noisy, reference_image, image_caption
+            )
         else:
-            # w(t), sigma_t^2
-            w = 1 - self.alphas[t]
-            grad = w * (noise_pred - noise)
-            imgs = None
+            loss = self.score_distillation_sampling_loss(noise_pred, noise, latents, t_sample)
 
-            # clip grad for stable training?
-            grad = torch.nan_to_num(grad)
-            latents.backward(gradient=grad, retain_graph=True)
-            loss = 0
-
-        return loss, imgs  # dummy loss value
+        return loss, images
 
     def prompt_to_img(
         self,
@@ -290,7 +289,7 @@ class StableDiffusion(nn.Module):
 
         text_embeds = self.clip.get_text_embeds(
             prompts, negative_prompts
-        )  # [2, 77, 768]
+        )
         latents = self.diffusion.produce_latents(
             text_embeds,
             height=height,
@@ -298,8 +297,8 @@ class StableDiffusion(nn.Module):
             latents=latents,
             num_inference_steps=num_inference_steps,
             guidance_scale=guidance_scale,
-        )  # [1, 4, 64, 64]
-        image = self.diffusion.decode_latents(latents)  # [1, 3, 512, 512]
+        )
+        image = self.diffusion.decode_latents(latents)
         image = image.squeeze()
         return image
 
@@ -332,7 +331,6 @@ def main():
         imgs,
         os.path.join(output_path, prompt.replace(" ", "_") + ".png"),
     )
-
 
 if __name__ == "__main__":
     main()

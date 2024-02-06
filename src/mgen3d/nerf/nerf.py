@@ -83,9 +83,9 @@ class NeRF:
         else:
             output_shape = (input_dict["H"], input_dict["W"], 3)
 
-        rgb_map = self.render_image(rays_o, rays_d, output_shape, self.chunk_size)
+        rgb_map, opacity_map, depth_map = self.render_image(rays_o, rays_d, output_shape, self.chunk_size)
 
-        return rgb_map
+        return rgb_map, opacity_map, depth_map
 
     def train(
         self,
@@ -151,55 +151,74 @@ class NeRF:
         # create index list and shuffle before iteratinng through images
         dataloader = DataLoader(dataset, 1, shuffle=True, num_workers=0)
         for sample in tqdm.tqdm(dataloader):
-            # update occupancy grid
-            def occ_eval_fn(x):
-                density = self._network(x)
-                occ = density * self.render_step_size_
-                return occ
-
-            self._estimator.update_every_n_steps(
-                step=self._step,
-                occ_eval_fn=occ_eval_fn,
-                occ_thre=1e-2,
-            )
-            self._step = self._step + 1
-
-            # get image
-            image = sample["imgs"].squeeze().to(device)
-
-            # generate random ray sample coordinates
-            if self.num_rays is None:
-                ray_coords = None
-                target = image
-            else:
-                H = sample["H"].item()
-                W = sample["W"].item()
-                coords = torch.stack(
-                    torch.meshgrid(
-                        torch.linspace(0, H - 1, H),
-                        torch.linspace(0, W - 1, W),
-                        indexing="ij",
-                    ),
-                    -1,
-                )  # (H, W, 2)
-                coords = torch.reshape(coords, [-1, 2])  # (H * W, 2)
-                select_inds = np.random.choice(
-                    coords.shape[0], size=[self.num_rays], replace=False
-                )  # (num_rays,)
-                ray_coords = coords[select_inds].long()  # (num_rays, 2)
-                target = image[ray_coords[:, 0], ray_coords[:, 1]]  # (num_rays, 3)
-
+            pred_image, _, _, target_image = self.train_one_step(sample)
             with torch.cuda.amp.autocast():
-                rgb_map = self.forward_pass(sample, ray_coords)
-                loss = self.loss_fn(rgb_map, target)
-            self.optimize(loss, epoch_num)
-            train_loss += loss.item()
+                sample_loss = self.loss_fn(pred_image, target_image)
+            self.optimize(sample_loss)
+            train_loss += sample_loss.item()
         train_loss /= len(dataset)
         self.save_checkpoint(epoch_num, train_loss)
 
         return train_loss
+    
+    def train_one_step(self, sample: dict):
+        self.update_occ_grid()
+        self._step = self._step + 1
 
-    def optimize(self, loss: torch.Tensor, epoch: int):
+        # get image
+        image = sample["imgs"].squeeze().to(device)
+        ray_coords = self.get_ray_coords(sample["H"].item(), sample["W"].item())
+        target_image = self.get_target_image(image, ray_coords)
+
+        with torch.cuda.amp.autocast():
+            pred_image, pred_opacity, pred_depth = self.forward_pass(sample, ray_coords)
+        return pred_image, pred_opacity, pred_depth, target_image
+
+    def update_occ_grid(self):
+        # update occupancy grid
+        def occ_eval_fn(x):
+            density = self._network(x)
+            occ = density * self.render_step_size_
+            return occ
+
+        self._estimator.update_every_n_steps(
+            step=self._step,
+            occ_eval_fn=occ_eval_fn,
+            occ_thre=1e-2,
+        )
+
+    def get_ray_coords(self, H: int=None, W: int=None):
+        # generate random ray sample coordinates if not taking entire image
+        if self.num_rays is None:
+            ray_coords = None
+        else:
+            ray_coords = self.sample_ray_coords(H, W, self.num_rays)
+        return ray_coords
+    
+    def get_target_image(self, image: torch.Tensor, ray_coords: torch.Tensor):
+        if ray_coords is None:
+            target = image
+        else:
+            target = image[ray_coords[:, 0], ray_coords[:, 1]]  # (num_rays, 3)
+        return target
+    
+    def sample_ray_coords(self, H: int, W: int, num_rays: int):
+        coords = torch.stack(
+            torch.meshgrid(
+                torch.linspace(0, H - 1, H),
+                torch.linspace(0, W - 1, W),
+                indexing="ij",
+            ),
+            -1,
+        )  # (H, W, 2)
+        coords = torch.reshape(coords, [-1, 2])  # (H * W, 2)
+        select_inds = np.random.choice(
+            coords.shape[0], size=[num_rays], replace=False
+        )  # (num_rays,)
+        ray_coords = coords[select_inds].long()  # (num_rays, 2)
+        return ray_coords
+
+    def optimize(self, loss: torch.Tensor):
         self._optimizer.zero_grad()
         self._grad_scaler.scale(loss).backward()
         nn.utils.clip_grad_norm_(self._network.parameters(), self.grad_norm_clip)
@@ -224,7 +243,7 @@ class NeRF:
             dataloader = DataLoader(dataset, 1, shuffle=True, num_workers=0)
             for sample in tqdm.tqdm(dataloader):
                 image = sample["imgs"].squeeze().to(device)
-                rgb_map = self.forward_pass(sample, None)
+                rgb_map, _, _ = self.forward_pass(sample, None)
                 mse_loss = self.loss_fn(rgb_map, image)
                 psnr += calc_psnr_from_mse(mse_loss)
         psnr /= len(dataset)
@@ -264,7 +283,9 @@ class NeRF:
         ray_d_chunks = get_chunks(rays_d, chunk_size)
 
         # neural radiance field querying
-        chunked_outputs = []
+        chunked_color_outputs = []
+        chunked_opacity_outputs = []
+        chunked_depth_outputs = []
         for ray_o_chunk, ray_d_chunk in zip(ray_o_chunks, ray_d_chunks):
             ray_o_chunk = ray_o_chunk.reshape(-1, ray_o_chunk.shape[-1])
             ray_d_chunk = ray_d_chunk.reshape(-1, ray_d_chunk.shape[-1])
@@ -291,10 +312,14 @@ class NeRF:
                 rgb_sigma_fn=rgb_sigma_fn,
                 render_bkgd=torch.tensor([1.0, 1.0, 1.0]).to(device),
             )
-            chunked_outputs.append(color)
-        outputs = torch.cat(chunked_outputs, dim=0).reshape(output_shape)
+            chunked_color_outputs.append(color)
+            chunked_opacity_outputs.append(opacity)
+            chunked_depth_outputs.append(depth)
+        color_outputs = torch.cat(chunked_color_outputs, dim=0).reshape(output_shape)
+        opacity_outputs = torch.cat(chunked_opacity_outputs, dim=0).reshape(output_shape[0], 1)
+        depth_outputs = torch.cat(chunked_depth_outputs, dim=0).reshape(output_shape[0], 1)
 
-        return outputs
+        return color_outputs, opacity_outputs, depth_outputs
 
     def render_view(self, view_dict: np.ndarray):
         """Render a view from a given pose.
@@ -307,7 +332,7 @@ class NeRF:
         """
         self._network.eval()
         with torch.no_grad():
-            rgb_map = self.forward_pass(view_dict, None)
+            rgb_map, _, _ = self.forward_pass(view_dict, None)
             rgb_map = rgb_map.cpu().numpy()
             rgb_map = np.maximum(
                 np.minimum(rgb_map, np.ones_like(rgb_map)), np.zeros_like(rgb_map)

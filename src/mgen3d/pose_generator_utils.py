@@ -23,7 +23,6 @@ rot_theta = lambda th: np.array(
     ]
 )
 
-
 def create_spherical_pose(theta: float, phi: float, radius: float):
     """
 
@@ -76,15 +75,15 @@ class SphericalPoseSampler:
                 0
             ]
             phi = (self.phi_range[1] - self.phi_range[0]) / 2 + self.phi_range[0]
-            is_front = True
+            is_reference_view = True
         else:
             radius = np.random.uniform(self.radius_range[0], self.radius_range[1])
             theta = np.random.uniform(self.theta_range[0], self.theta_range[1])
             phi = np.random.uniform(self.phi_range[0], self.phi_range[1])
-            is_front = False
+            is_reference_view = False
         pose = create_spherical_pose(theta, phi, radius)
 
-        return pose, is_front
+        return pose, is_reference_view
 
     def sample_poses(self, num_poses: int = 1):
         """Generate a list of poses on a sphere
