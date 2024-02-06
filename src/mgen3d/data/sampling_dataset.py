@@ -19,6 +19,7 @@ class SamplingDataset(NeRFDataset):
         fov_ref: float = 20.0,
         fov_range: tuple = (15.0, 25.0),
         epsilon: float = 0.25,
+        image_caption: str = None,
     ):
         super.__init__(root_dir, data_split, transform, white_background)
         assert self.imgs.shape[0] == 1, "Only one reference view should be provided in the dataset"
@@ -33,6 +34,7 @@ class SamplingDataset(NeRFDataset):
         self.fov_range = fov_range
         self.H = self.imgs.shape[1]
         self.W = self.imgs.shape[2]
+        self.image_caption = image_caption
 
     def __len__(self):
         return 1
@@ -59,7 +61,8 @@ class SamplingDataset(NeRFDataset):
             "is_reference_view": is_reference_view,
             "H": self.H,
             "W": self.W,
-            "K": self.get_intrinsics_(self.epsilon)
+            "K": self.get_intrinsics_(self.epsilon),
+            "image_caption": self.image_caption,
         }
         if is_reference_view:
             sample_data = self.imgs[0]

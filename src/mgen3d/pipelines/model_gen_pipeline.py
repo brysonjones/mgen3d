@@ -78,7 +78,9 @@ class Pipeline:
             # sample rays
             # sample points along rays
             # render with nerf
+            pred_image, _, _, _ = self.nerf.train_one_step(sample)
             # generate detailed description of the reference view with image captioning model (this can likely be done once ahead of time)
+                # TODO: for now, we can just manually provide the description with the image
             # encode the rendered image into latents with the diffusion model
             # perform noise prediction with the diffusion model
                 # if t step of diffusion scheduler is below threshold:
