@@ -154,7 +154,7 @@ class NeRF:
             pred_image, _, _, target_image = self.train_one_step(sample)
             with torch.cuda.amp.autocast():
                 sample_loss = self.loss_fn(pred_image, target_image)
-            self.optimize(sample_loss, epoch_num)
+            self.optimize(sample_loss)
             train_loss += sample_loss.item()
         train_loss /= len(dataset)
         self.save_checkpoint(epoch_num, train_loss)
@@ -218,7 +218,7 @@ class NeRF:
         ray_coords = coords[select_inds].long()  # (num_rays, 2)
         return ray_coords
 
-    def optimize(self, loss: torch.Tensor, epoch: int):
+    def optimize(self, loss: torch.Tensor):
         self._optimizer.zero_grad()
         self._grad_scaler.scale(loss).backward()
         nn.utils.clip_grad_norm_(self._network.parameters(), self.grad_norm_clip)

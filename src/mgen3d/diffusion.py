@@ -226,28 +226,26 @@ class StableDiffusion(nn.Module):
         ) + self.clip_loss_scale_factor * self.clip.img_text_clip_loss(images, ref_text)
         return loss, images
 
-    def train_step(
+    def train_one_step(
         self,
+        pred_image,
         text_embeddings,
-        pred_rgb,
-        ref_rgb=None,
-        noise=None,
-        islarge=False,
-        ref_text=None,
+        reference_image=None,
+        image_caption=None,
         guidance_scale=10,
     ):
         loss = 0
         images = None
 
-        pred_rgb_512 = F.interpolate(
-            pred_rgb, (512, 512), mode="bilinear", align_corners=False
+        pred_image = F.interpolate(
+            pred_image, (512, 512), mode="bilinear", align_corners=False
         )
 
         t_sample = torch.randint(
             self.min_step, self.max_step + 1, [1], dtype=torch.long, device=self.device
         )
 
-        latents = self.encode_imgs(pred_rgb_512)
+        latents = self.encode_imgs(pred_image)
 
         with torch.no_grad():
             noise = torch.randn_like(latents)
@@ -264,9 +262,9 @@ class StableDiffusion(nn.Module):
                 noise_pred_text - noise_pred_uncond
             )
 
-        if not islarge and (t_sample / self.num_train_timesteps) <= self.t_threshold_for_loss:
+        if (t_sample / self.num_train_timesteps) <= self.t_threshold_for_loss:
             loss, images = self.clip_loss(
-                noise_pred, t_sample, latents_noisy, ref_rgb, ref_text
+                noise_pred, t_sample, latents_noisy, reference_image, image_caption
             )
         else:
             loss = self.score_distillation_sampling_loss(noise_pred, noise, latents, t_sample)
